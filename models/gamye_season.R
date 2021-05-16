@@ -308,18 +308,24 @@ model
 	    B_season[k] ~ dnorm(0,tau_B_season)
 	    
 	    
-	  beta_season_p[1,k] ~ dnorm(0,taubeta_season) #
+	  # beta_season_p[1,k] ~ dnorm(0,taubeta_season) #
+	  # 
+	  # beta_season[1,k] <- B_season[k]+beta_season_p[1,k]
 	  
-	  beta_season[1,k] <- B_season[k]+beta_season_p[1,k]
+	  #beta_season_p[1,k] ~ dnorm(0,taubeta_season) #
+	  
+	  beta_season[1,k] <- B_season[k]#+beta_season_p[1,k]
 	  
 	    
 	    for(i in 2:ndecades)
 	      
 	    {
 	      
-	      beta_season_p[i,k] ~ dnorm(beta_season_p[i-1,k],taubeta_season) #
+	      beta_season[i,k] ~ dnorm(beta_season[i-1,k],taubeta_season) #
+	      #beta_season_p[i,k] ~ dnorm(beta_season_p[i-1,k],taubeta_season) #
 	      
-	      beta_season[i,k] <- B_season[k]+beta_season_p[i,k]
+	      #beta_season[i,k] <- B_season[k]+beta_season_p[i,k]
+	      
 	      
 	    }
 	  

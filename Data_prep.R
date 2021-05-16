@@ -104,3 +104,67 @@ fit <- bbsBayes::run_model(jags_data = spsData,
                            model_file_path = "models/gamye_season.R",
                            parameters_to_save = parms,
                            parallel = TRUE)
+
+inds = generate_indices(fit,jags_data = spsData,alternate_n = "n3")
+trends = generate_trends(indices = inds,Min_year = 1970)
+inds2 = generate_indices(fit,jags_data = spsData,alternate_n = "n")
+ip = plot_indices(inds2,min_year = 1970)
+
+
+seas <- tidybayes::gather_draws(fit$samples,seasoneffect[decade,day])
+seas_sum <- seas %>% group_by(.variable,decade,day) %>% 
+  summarise(mean = mean(exp(.value)),
+            lci = quantile(exp(.value),0.025),
+            uci = quantile(exp(.value),0.975)) %>% 
+  mutate(decadeF = factor(decade,
+                          levels = 1:5,
+                          labels = c("1966-1979",
+                             "1980-1989",
+                             "1990-1999",
+                             "2000-2009",
+                             "2010-2019"),
+         ordered = TRUE))
+seas_p = ggplot(data = seas_sum,aes(x = day,y = mean))+
+  #geom_ribbon(aes(ymin = lci,ymax = uci,fill = decadeF),alpha = 0.05) + 
+  geom_line(aes(colour = decadeF))+
+  scale_y_continuous(limits = c(0,NA))+
+  scale_colour_viridis_d(begin = 0.2,end = 0.8,aesthetics = c("colour","fill"))+
+  ylab("Effect of season on counts (mean additional birds due to season)")+
+  xlab("day of BBS season")+
+  labs(title = "Seasonal pattern in counts by decade for Allen's Hummingbird")
+
+seas_p_f = ggplot(data = seas_sum,aes(x = day,y = mean))+
+  geom_ribbon(aes(ymin = lci,ymax = uci,fill = decadeF),alpha = 0.2) + 
+  geom_line(aes(colour = decadeF))+
+  scale_y_continuous(limits = c(0,NA))+
+  scale_colour_viridis_d(begin = 0.2,end = 0.8,aesthetics = c("colour","fill"))+
+  ylab("Effect of season on counts (mean additional birds due to season)")+
+  xlab("day of BBS season")+
+  labs(title = "Seasonal pattern in counts by decade for Allen's Hummingbird")+
+  theme(legend.position = "none")+
+  facet_wrap(~decadeF,nrow = 2,scales = "fixed")
+
+
+pdf(file = paste0("figures/",species,"_seasonal_effect_by_decade.pdf"))
+print(seas_p)
+print(seas_p_f)
+for(i in length(ip):1){
+  rr = unique(inds2$data_summary$Region)[i]
+tmp1 = inds$data_summary
+wtt = which(trends$Region == rr)
+ttr = round(trends[wtt,"Trend"],1)
+ttr1 = round(trends[wtt,"Trend_Q0.025"],1)
+ttr2 = round(trends[wtt,"Trend_Q0.975"],1)
+
+lbl = paste0(ttr," [",ttr1," : ",ttr2,"]")
+tmp = tmp1 %>% filter(Region == rr,Year >= 1970)
+yup = 0.9*max(tmp1$Index_q_0.975)
+ggadd <- ip[[i]] + geom_ribbon(data = tmp,aes(x = Year, ymin = Index_q_0.025,ymax = Index_q_0.975),
+                               alpha = 0.2,fill = "darkorange")+
+  geom_line(data = tmp,aes(x = Year, y = Index),colour = "darkorange")+
+  annotate("text",x = 2000,y = yup*0.7,label = lbl)
+print(ggadd)
+}
+dev.off()
+
+
