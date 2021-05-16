@@ -14,7 +14,7 @@ source("Functions/GAM_basis_function_mgcv.R")
 
 st_dat = stratify(by = "bbs_cws")
 
-species = "Allen's Hummingbird"
+species = "Great-horned owl"
 
 
 spsData = prepare_jags_data(st_dat,species_to_run = species,
