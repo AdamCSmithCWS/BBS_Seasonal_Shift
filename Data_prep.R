@@ -14,7 +14,7 @@ source("Functions/GAM_basis_function_mgcv.R")
 
 st_dat = stratify(by = "bbs_cws")
 
-species = "Great-horned owl"
+species = "Great Horned Owl"
 
 
 spsData = prepare_jags_data(st_dat,species_to_run = species,
@@ -22,18 +22,48 @@ spsData = prepare_jags_data(st_dat,species_to_run = species,
                             heavy_tailed = TRUE)
 
 
+biomes <- read.csv("data/Biomes_by_BCR.csv")
+
+str_bcr <- get_composite_regions("bbs_cws")
+bcr_bi <- biomes[which(is.na(biomes$prov_state_split)),c("BCR","biome")]
+
+str_bcr <- left_join(str_bcr,bcr_bi,by = c("bcr" = "BCR"))
+
+miss_strat = str_bcr[which(is.na(str_bcr$biome)),"region"]
+
+for(i in miss_strat){
+tmp_bi <- biomes[which(biomes$strata_names == i),"biome"]
+str_bcr[which(str_bcr$region == i),"biome"] <- tmp_bi
+}
+
+
+biome_merge = data.frame(strat = spsData$strat,
+                         strat_name = spsData$strat_name,
+                         sorder = 1:spsData$ncounts)
+
+biome_merge <- left_join(biome_merge,str_bcr,
+                         by = c("strat_name" = "region")) %>% 
+  arrange(sorder) %>% 
+  mutate(biomeF = as.integer(factor(biome)))
+
+spsData$biome <- biome_merge$biomeF
+spsData$nbiome <- max(biome_merge$biomeF)
+biom_df <- biome_merge %>% 
+  select(-sorder) %>% 
+  distinct()
+
 #require(lubridate)
 spsData$doy = lubridate::yday(as.Date(paste(spsData$r_year,
                             spsData$month,
                             spsData$day,
                             sep = "-")))
 
-spsData$decadeF = cut(spsData$r_year,breaks = c(1966,
+spsData$decadeF = cut(spsData$r_year,breaks = c(1965,
                                                 1979.5,
                                                 1989.5,
                                                1999.5,
                                                2009.5,
-                                               2019.5),
+                                               2020),
                      labels = c("70s",
                                 "80s",
                                 "90s",
@@ -43,27 +73,27 @@ spsData$decadeF = cut(spsData$r_year,breaks = c(1966,
 
 spsData$decade = as.integer(spsData$decadeF)
 
-tmp = data.frame(year = spsData$year,
-                 route = factor(spsData$route),
-                 obser = factor(spsData$obser),
-                 count = spsData$count,
-                 lcount = log(spsData$count+1,base = 10),
-                 doy = spsData$doy,
-                 decadeF = spsData$decadeF,
-                 yr_d = as.integer(str_sub(spsData$r_year,4,4)),
-                 week = cut(spsData$doy,breaks = seq(134,195,by = 7)))
-
-
-
-bp = ggplot(data = tmp,aes(y = lcount,x = doy,colour = yr_d))+
-  #geom_boxplot(varwidth = TRUE)+
-  #geom_violin()+
-  geom_point(alpha = 0.3,position = position_jitter(width = 0.25))+
-  #scale_y_log10()+
-  scale_colour_viridis_c(begin = 0.1,end = 0.7)+
-  geom_smooth()+
-  facet_wrap(~decadeF,nrow = 2)
-print(bp)
+# tmp = data.frame(year = spsData$year,
+#                  route = factor(spsData$route),
+#                  obser = factor(spsData$obser),
+#                  count = spsData$count,
+#                  lcount = log(spsData$count+1,base = 10),
+#                  doy = spsData$doy,
+#                  decadeF = spsData$decadeF,
+#                  yr_d = as.integer(str_sub(spsData$r_year,4,4)),
+#                  week = cut(spsData$doy,breaks = seq(134,195,by = 7)))
+# 
+# 
+# 
+# bp = ggplot(data = tmp,aes(y = lcount,x = doy,colour = yr_d))+
+#   #geom_boxplot(varwidth = TRUE)+
+#   #geom_violin()+
+#   geom_point(alpha = 0.3,position = position_jitter(width = 0.25))+
+#   #scale_y_log10()+
+#   scale_colour_viridis_c(begin = 0.1,end = 0.7)+
+#   geom_smooth()+
+#   facet_wrap(~decadeF,nrow = 2)
+# print(bp)
 
 
 spsData$season <- spsData$doy-(min(spsData$doy)-1)
@@ -101,7 +131,7 @@ spsData$decadeF <- NULL
 
 
 fit <- bbsBayes::run_model(jags_data = spsData,
-                           model_file_path = "models/gamye_season.R",
+                           model_file_path = "models/gamye_season_biome.R",
                            parameters_to_save = parms,
                            parallel = TRUE)
 
