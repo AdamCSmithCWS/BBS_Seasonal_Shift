@@ -14,9 +14,31 @@ source("Functions/GAM_basis_function_mgcv.R")
 
 st_dat = stratify(by = "bbs_cws")
 
+
+events = st_dat$route_strat
+events$date <- as.Date(paste(events$Year,
+              events$Month,
+              events$Day,
+              sep = "-"))
+events$date_text <- as.Date(paste(1966,
+                             events$Month,
+                             events$Day,
+                             sep = "-"))
+events$doy = lubridate::yday(events$date)
+
+first_may <- lubridate::yday("1966-05-01")
+w_too_early <- which(events$doy < first_may)
+
+fourteenth_july <- lubridate::yday("1966-07-14")
+w_too_late <- which(events$doy > fourteenth_july)
+
+write.csv(events[c(w_too_early,w_too_late),],"BBS surveys before May 01 or after July 14.csv")
+
+
+
 species = "American Woodcock"
 
-
+drop_outside_dates
 spsData = prepare_jags_data(st_dat,species_to_run = species,
                             model = "gamye",
                             heavy_tailed = TRUE)
@@ -50,8 +72,14 @@ spsData$biome <- biome_merge$biomeF
 spsData$nbiome <- max(biome_merge$biomeF)
 biom_df <- biome_merge %>% 
   select(-sorder) %>% 
-  distinct()
+  distinct() 
 
+
+biome_names <- biom_df %>% 
+  select(biome,biomeF) %>% 
+  distinct()%>% 
+  rename(biome_name = biome,
+         biome = biomeF)
 #require(lubridate)
 spsData$doy = lubridate::yday(as.Date(paste(spsData$r_year,
                             spsData$month,
@@ -141,8 +169,8 @@ inds2 = generate_indices(fit,jags_data = spsData,alternate_n = "n")
 ip = plot_indices(inds2,min_year = 1970)
 
 
-seas <- tidybayes::gather_draws(fit$samples,seasoneffect[decade,day])
-seas_sum <- seas %>% group_by(.variable,decade,day) %>% 
+seas <- tidybayes::gather_draws(fit$samples,seasoneffect[biome,decade,day])
+seas_sum <- seas %>% group_by(.variable,biome,decade,day) %>% 
   summarise(mean = mean(exp(.value)),
             lci = quantile(exp(.value),0.025),
             uci = quantile(exp(.value),0.975)) %>% 
@@ -153,31 +181,58 @@ seas_sum <- seas %>% group_by(.variable,decade,day) %>%
                              "1990-1999",
                              "2000-2009",
                              "2010-2019"),
-         ordered = TRUE))
+         ordered = TRUE)) %>% 
+  left_join(.,biome_names,by = c("biome"))
+nbiome_sqrt = ceiling(sqrt(spsData$nbiome))
+
+raw = data.frame(decadeF = factor(spsData$decade,
+                                                levels = 1:5,
+                                                labels = c("1966-1979",
+                                                           "1980-1989",
+                                                           "1990-1999",
+                                                           "2000-2009",
+                                                           "2010-2019"),
+                                                ordered = TRUE),
+                 count = spsData$count,
+                 mean = (spsData$count-mean(spsData$count)),
+                 day = spsData$season,
+                 biome = spsData$biome) %>% 
+  left_join(.,biome_names,by = "biome")
 seas_p = ggplot(data = seas_sum,aes(x = day,y = mean))+
   #geom_ribbon(aes(ymin = lci,ymax = uci,fill = decadeF),alpha = 0.05) + 
+  geom_point(data = raw,aes(x = day,y = count,colour = decadeF),alpha = 0.3)+
   geom_line(aes(colour = decadeF))+
   scale_y_continuous(limits = c(0,NA))+
   scale_colour_viridis_d(begin = 0.2,end = 0.8,aesthetics = c("colour","fill"))+
   ylab("Effect of season on counts (mean additional birds due to season)")+
   xlab("day of BBS season")+
-  labs(title = "Seasonal pattern in counts by decade for Allen's Hummingbird")
+  labs(title = paste0("Seasonal pattern in counts by decade for ",species))+
+  facet_wrap(~biome_name,nrow = nbiome_sqrt,scales = "fixed")
+print(seas_p)
 
-seas_p_f = ggplot(data = seas_sum,aes(x = day,y = mean))+
+seas_p_f <- vector(mode = "list",length = spsData$nbiome)
+for(b in 1:spsData$nbiome){
+  seas_sumt <- filter(seas_sum,biome == b)
+  rawt = filter(raw,biome == b)
+  biome_n = biome_names[which(biome_names$biome == b),"biome_name"]
+seas_p_f[[b]] = ggplot(data = seas_sumt,aes(x = day,y = mean))+
+  geom_point(data = rawt,aes(x = day,y = count,colour = decadeF),alpha = 0.3)+
   geom_ribbon(aes(ymin = lci,ymax = uci,fill = decadeF),alpha = 0.2) + 
   geom_line(aes(colour = decadeF))+
   scale_y_continuous(limits = c(0,NA))+
   scale_colour_viridis_d(begin = 0.2,end = 0.8,aesthetics = c("colour","fill"))+
   ylab("Effect of season on counts (mean additional birds due to season)")+
   xlab("day of BBS season")+
-  labs(title = "Seasonal pattern in counts by decade for Allen's Hummingbird")+
+  labs(title = paste0(biome_n," Seasonal pattern in counts by decade for",species))+
   theme(legend.position = "none")+
   facet_wrap(~decadeF,nrow = 2,scales = "fixed")
-
+}
 
 pdf(file = paste0("figures/",species,"_seasonal_effect_by_decade.pdf"))
 print(seas_p)
-print(seas_p_f)
+for(b in 1:spsData$nbiome){
+print(seas_p_f[[b]])
+}
 for(i in length(ip):1){
   rr = unique(inds2$data_summary$Region)[i]
 tmp1 = inds$data_summary
