@@ -14,43 +14,13 @@ source("Functions/GAM_basis_function_mgcv.R")
 
 st_dat = stratify(by = "bbs_cws")
 
-species = "American Woodcock"
+species = "Allen's Hummingbird"
 
 
 spsData = prepare_jags_data(st_dat,species_to_run = species,
                             model = "gamye",
                             heavy_tailed = TRUE)
 
-
-biomes <- read.csv("data/Biomes_by_BCR.csv")
-
-str_bcr <- get_composite_regions("bbs_cws")
-bcr_bi <- biomes[which(is.na(biomes$prov_state_split)),c("BCR","biome")]
-
-str_bcr <- left_join(str_bcr,bcr_bi,by = c("bcr" = "BCR"))
-
-miss_strat = str_bcr[which(is.na(str_bcr$biome)),"region"]
-
-for(i in miss_strat){
-tmp_bi <- biomes[which(biomes$strata_names == i),"biome"]
-str_bcr[which(str_bcr$region == i),"biome"] <- tmp_bi
-}
-
-
-biome_merge = data.frame(strat = spsData$strat,
-                         strat_name = spsData$strat_name,
-                         sorder = 1:spsData$ncounts)
-
-biome_merge <- left_join(biome_merge,str_bcr,
-                         by = c("strat_name" = "region")) %>% 
-  arrange(sorder) %>% 
-  mutate(biomeF = as.integer(factor(biome)))
-
-spsData$biome <- biome_merge$biomeF
-spsData$nbiome <- max(biome_merge$biomeF)
-biom_df <- biome_merge %>% 
-  select(-sorder) %>% 
-  distinct()
 
 #require(lubridate)
 spsData$doy = lubridate::yday(as.Date(paste(spsData$r_year,
@@ -131,7 +101,7 @@ spsData$decadeF <- NULL
 
 
 fit <- bbsBayes::run_model(jags_data = spsData,
-                           model_file_path = "models/gamye_season_biome.R",
+                           model_file_path = "models/gamye_season.R",
                            parameters_to_save = parms,
                            parallel = TRUE)
 
