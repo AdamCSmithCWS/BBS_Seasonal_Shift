@@ -29,16 +29,16 @@ events$doy = lubridate::yday(events$date)
 first_may <- lubridate::yday("1966-05-01")
 w_too_early <- which(events$doy < first_may)
 
-fourteenth_july <- lubridate::yday("1966-07-14")
-w_too_late <- which(events$doy > fourteenth_july)
+sixteenth_july <- lubridate::yday("1966-07-16")
+w_too_late <- which(events$doy > sixteenth_july)
 
-write.csv(events[c(w_too_early,w_too_late),],"BBS surveys before May 01 or after July 14.csv")
+# write.csv(events[c(w_too_early,w_too_late),],"BBS surveys before May 01 or after July 14.csv")
 
-
+st_dat$route_strat <- st_dat$route_strat[-w_too_late,]
 
 species = "American Woodcock"
 
-drop_outside_dates
+#drop_outside_dates
 spsData = prepare_jags_data(st_dat,species_to_run = species,
                             model = "gamye",
                             heavy_tailed = TRUE)
