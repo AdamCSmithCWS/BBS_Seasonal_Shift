@@ -25,6 +25,12 @@ gam_basis <- function(orig.preds = dts[,"yr"],
                           y = rnorm(length(predpoints),0,0.1))
     
 
+        # nknots+1 is necessary because the mgcv interpretation of 
+      # number of knots includes the knots at either end of the distribution
+     # the number of basis functions is equal to the number of gaps between knots
+    # so nknots-1.
+    # I find it more intuitive if the nknots refers to the number of columns in the basis function
+    # 
     M = mgcv::smoothCon(s(x,k = nknots+1, bs = "tp"),data = dat,
                        absorb.cons=TRUE,#this drops the constant
                        diagonal.penalty=TRUE) ## If TRUE then the smooth is reparameterized to turn the penalty into an identity matrix, with the final diagonal elements zeroed (corresponding to the penalty nullspace). 
@@ -33,7 +39,7 @@ gam_basis <- function(orig.preds = dts[,"yr"],
     gamx.basis = M[[1]]$X
     
     
-    M_pred = smoothCon(s(x,k = nknots+1, bs = "tp"),data = dat_pred,
+    M_pred = mgcv::smoothCon(s(x,k = nknots+1, bs = "tp"),data = dat_pred,
                        absorb.cons=TRUE,#this drops the constant
                        diagonal.penalty=TRUE) ## If TRUE then the smooth is reparameterized to turn the penalty into an identity matrix, with the final diagonal elements zeroed (corresponding to the penalty nullspace). 
     
