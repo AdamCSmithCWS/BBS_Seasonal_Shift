@@ -25,7 +25,7 @@ gam_basis <- function(orig.preds = dts[,"yr"],
                           y = rnorm(length(predpoints),0,0.1))
     
 
-    M = smoothCon(s(x,k = nknots+1, bs = "tp"),data = dat,
+    M = mgcv::smoothCon(s(x,k = nknots+1, bs = "tp"),data = dat,
                        absorb.cons=TRUE,#this drops the constant
                        diagonal.penalty=TRUE) ## If TRUE then the smooth is reparameterized to turn the penalty into an identity matrix, with the final diagonal elements zeroed (corresponding to the penalty nullspace). 
     
